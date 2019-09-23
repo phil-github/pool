@@ -10,13 +10,14 @@ Golang 实现的连接池
 - 连接的最大空闲时间，超时的连接将关闭丢弃，可避免空闲时连接自动失效问题
 - 支持用户设定 ping 方法，检查连接的连通性，无效的连接将丢弃
 - 使用channel处理池中的连接，高效
+- 最大连接数限定 避免可以无限创建连接
 
 ## 基本用法
 
 ```go
 
 //factory 创建连接的方法
-factory := func() (interface{}, error) { return net.Dial("tcp", "127.0.0.1:4000") }
+factory := func() (interface{}, error) { return net.Dial("tcp", "127.0.0.1:8000") }
 
 //close 关闭连接的方法
 close := func(v interface{}) error { return v.(net.Conn).Close() }
@@ -48,19 +49,19 @@ v, err := p.Get()
 //将连接放回连接池中
 p.Put(v)
 
+//查看当前空闲连接的数量
+current := p.Len()
+
+//查看当前还可创建连接的数量
+current := p.Remain()
+
+//使用中的连接数量
+//Max-p.Len()-p.Remain()
+
 //释放连接池中的所有连接
 p.Release()
 
-//查看当前连接中的数量
-current := p.Len()
-
-
 ```
-
-
-#### 注:
-该连接池参考 [https://github.com/fatih/pool](https://github.com/fatih/pool) 实现，改变以及增加原有的一些功能。
-
 
 ## License
 
