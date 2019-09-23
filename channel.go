@@ -25,6 +25,7 @@ type channelPool struct {
 	close       func(interface{}) error
 	ping        func(interface{}) error
 	idleTimeout time.Duration
+	remain      int
 }
 
 type idleConn struct {
@@ -49,6 +50,7 @@ func NewChannelPool(poolConfig *PoolConfig) (Pool, error) {
 		factory:     poolConfig.Factory,
 		close:       poolConfig.Close,
 		idleTimeout: poolConfig.IdleTimeout,
+		remain:      poolConfig.MaxCap - poolConfig.InitialCap,
 	}
 
 	if poolConfig.Ping != nil {
@@ -90,7 +92,7 @@ func (c *channelPool) Get() (interface{}, error) {
 			// 判断是否超时，超时则丢弃
 			if timeout := c.idleTimeout; timeout > 0 {
 				if wrapConn.t.Add(timeout).Before(time.Now()) {
-					//丢弃并关闭该连接
+					// 丢弃并关闭该连接
 					c.Close(wrapConn.conn)
 					continue
 				}
@@ -98,6 +100,7 @@ func (c *channelPool) Get() (interface{}, error) {
 			// 判断是否失效，失效则丢弃，如果用户没有设定 ping 方法，就不检查
 			if c.ping != nil {
 				if err := c.Ping(wrapConn.conn); err != nil {
+					c.Close(wrapConn.conn)
 					fmt.Println("conn is not able to be connected: ", err)
 					continue
 				}
@@ -114,10 +117,19 @@ func (c *channelPool) Connect() (interface{}, error) {
 	if c.factory == nil {
 		return nil, errors.New("factory func is nil. rejecting")
 	}
+
+	// 无可新建连接数时失败
+	if c.remain <= 0 {
+		return nil, ErrLimited
+	}
+
 	conn, err := c.factory()
 	if err != nil {
 		return nil, err
 	}
+
+	// 可新建连接数减少
+	c.remain--
 	return conn, nil
 }
 
@@ -138,7 +150,7 @@ func (c *channelPool) Put(conn interface{}) error {
 	case c.conns <- &idleConn{conn: conn, t: time.Now()}:
 		return nil
 	default:
-		//连接池已满，直接关闭该连接
+		//连接池已满，直接关闭该连接 可用数量增加
 		return c.Close(conn)
 	}
 }
@@ -151,6 +163,9 @@ func (c *channelPool) Close(conn interface{}) error {
 	if c.close == nil {
 		return errors.New("close func is nil. rejecting")
 	}
+
+	//可新建连接数增加 别多Close
+	c.remain++
 	return c.close(conn)
 }
 
@@ -189,4 +204,9 @@ func (c *channelPool) Release() {
 // Len 连接池中已有的连接
 func (c *channelPool) Len() int {
 	return len(c.getConns())
+}
+
+// Remain 可新建连接数
+func (c *channelPool) Remain() int {
+	return c.remain
 }

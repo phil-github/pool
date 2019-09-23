@@ -4,7 +4,8 @@ import "errors"
 
 var (
 	// ErrClosed 连接池已经关闭Error
-	ErrClosed = errors.New("pool is closed")
+	ErrClosed  = errors.New("pool is closed")
+	ErrLimited = errors.New("pool is limited")
 )
 
 // Pool 基本方法
@@ -20,4 +21,6 @@ type Pool interface {
 	Release()
 
 	Len() int
+
+	Remain() int
 }
