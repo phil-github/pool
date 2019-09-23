@@ -46,7 +46,7 @@ v, err := p.Get()
 //do something
 //conn=v.(net.Conn)
 
-//将连接放回连接池中
+//将连接放回连接池中 取出的连接 要么Put回去或者Close掉 否则限制数将不准确
 p.Put(v)
 
 //查看当前空闲连接的数量
