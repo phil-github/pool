@@ -50,10 +50,10 @@ v, err := p.Get()
 p.Put(v)
 
 //查看当前空闲连接的数量
-current := p.Len()
+size := p.Len()
 
 //查看当前还可创建连接的数量
-current := p.Remain()
+remain := p.Remain()
 
 //使用中的连接数量
 //Max-p.Len()-p.Remain()
