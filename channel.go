@@ -118,6 +118,9 @@ func (c *channelPool) Connect() (interface{}, error) {
 		return nil, errors.New("factory func is nil. rejecting")
 	}
 
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	// 无可新建连接数时失败
 	if c.remain <= 0 {
 		return nil, ErrLimited
@@ -140,17 +143,19 @@ func (c *channelPool) Put(conn interface{}) error {
 	}
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	if c.conns == nil {
+		c.mu.Unlock()
 		return c.Close(conn)
 	}
 
 	select {
 	case c.conns <- &idleConn{conn: conn, t: time.Now()}:
+		c.mu.Unlock()
 		return nil
 	default:
 		//连接池已满，直接关闭该连接 可用数量增加
+		c.mu.Unlock()
 		return c.Close(conn)
 	}
 }
@@ -163,6 +168,9 @@ func (c *channelPool) Close(conn interface{}) error {
 	if c.close == nil {
 		return errors.New("close func is nil. rejecting")
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	//可新建连接数增加 别多Close
 	c.remain++
